@@ -104,6 +104,51 @@ bash ./models/download_model.sh model_name
 - `day2night` (daytime scene -> nighttime scene): trained on around 100 [webcams](http://transattr.cs.brown.edu/).
 
 ## Setup Training and Test data
+### Using NIfTI CT pairs (HU→HU)
+This repo also supports training on paired CT volumes in NIfTI format with linear Hounsfield Unit scaling.
+
+Directory layout:
+
+- $DATA_ROOT/A/{train,val,test}/*.nii or *.nii.gz
+- $DATA_ROOT/B/{train,val,test}/*.nii or *.nii.gz
+
+Filenames must match between A and B. Volumes should be aligned and have the same 3D size. The loader samples axial slices and optionally excludes a number of slices at both ends via `exclude_slices`.
+
+Dependencies:
+
+```bash
+luarocks install nifti
+```
+
+Train HU→HU (single channel):
+
+```bash
+DATA_ROOT=/path/to/ct_pairs \
+name=ct_hu \
+preprocess=nifti_hu \
+input_nc=1 output_nc=1 \
+hu_min=-1000 hu_max=3000 \
+exclude_slices=5 \
+th train.lua
+```
+
+Test:
+
+```bash
+DATA_ROOT=/path/to/ct_pairs \
+name=ct_hu \
+preprocess=nifti_hu \
+input_nc=1 output_nc=1 \
+hu_min=-1000 hu_max=3000 \
+exclude_slices=5 \
+phase=val \
+th test.lua
+```
+
+Notes:
+- Internally we train on values linearly mapped from HU to [-1,1]; this preserves the HU metric structure. You can invert with `util.deprocess_HU` if you need to recover HU values.
+- Current implementation samples 2D axial slices. Extending to 3D requires changing the network architecture in `models.lua`.
+
 ### Generating Pairs
 We provide a python script to generate training data in the form of pairs of images {A,B}, where A and B are two different depictions of the same underlying scene. For example, these might be pairs {label map, photo} or {bw image, color image}. Then we can learn to translate A to B or B to A:
 

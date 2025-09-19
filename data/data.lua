@@ -20,7 +20,11 @@ function data.new(n, opt_)
       self[k] = v
    end
 
+   -- choose data-loading donkey based on preprocessing mode
    local donkey_file = 'donkey_folder.lua'
+   if opt_ and (opt_.preprocess == 'nifti_hu') then
+      donkey_file = 'donkey_nifti.lua'
+   end
    if n > 0 then
       local options = opt_
       self.threads = Threads(n,

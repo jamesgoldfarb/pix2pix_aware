@@ -22,6 +22,10 @@ opt = {
     which_direction = 'AtoB', -- AtoB or BtoA
     phase = 'val',            -- train, val, test ,etc
     preprocess = 'regular',   -- for special purpose preprocessing, e.g., for colorization, change this (selects preprocessing functions in util.lua)
+  -- HU/NIfTI options
+  hu_min = -1000,           -- HU lower window bound
+  hu_max = 3000,            -- HU upper window bound
+  exclude_slices = 0,       -- exclude N slices at both ends when sampling
     aspect_ratio = 1.0,       -- aspect ratio of result images
     name = '',                -- name of experiment, selects which model to run, should generally should be passed on command line
     input_nc = 3,             -- #  of input image channels
@@ -106,13 +110,19 @@ for n=1,math.floor(opt.how_many/opt.batchSize) do
         input = input:cuda()
     end
 
-    if opt.preprocess == 'colorization' then
+  if opt.preprocess == 'colorization' then
        local output_AB = netG:forward(input):float()
        local input_L = input:float()
        output = util.deprocessLAB_batch(input_L, output_AB)
        local target_AB = target:float()
        target = util.deprocessLAB_batch(input_L, target_AB)
        input = util.deprocessL_batch(input_L)
+  elseif opt.preprocess == 'nifti_hu' then
+    -- HU tensors are single-channel in [-1,1]; visualize by mapping to [0,1]
+    local out = netG:forward(input):float()
+    output = out:clone():add(1):div(2)
+    input = input:float():clone():add(1):div(2)
+    target = target:float():clone():add(1):div(2)
     else
         output = util.deprocess_batch(netG:forward(input))
         input = util.deprocess_batch(input):float()
@@ -125,11 +135,17 @@ for n=1,math.floor(opt.how_many/opt.batchSize) do
     paths.mkdir(paths.concat(image_dir,'input'))
     paths.mkdir(paths.concat(image_dir,'output'))
     paths.mkdir(paths.concat(image_dir,'target'))
-    for i=1, opt.batchSize do
-        image.save(paths.concat(image_dir,'input',filepaths_curr[i]), image.scale(input[i],input[i]:size(2),input[i]:size(3)/opt.aspect_ratio))
-        image.save(paths.concat(image_dir,'output',filepaths_curr[i]), image.scale(output[i],output[i]:size(2),output[i]:size(3)/opt.aspect_ratio))
-        image.save(paths.concat(image_dir,'target',filepaths_curr[i]), image.scale(target[i],target[i]:size(2),target[i]:size(3)/opt.aspect_ratio))
+  for i=1, opt.batchSize do
+    local fname = filepaths_curr[i]
+    if opt.preprocess == 'nifti_hu' then
+      -- ensure .png extension for visualization files
+      fname = fname:gsub('%.nii%.gz$', '.png')
+      fname = fname:gsub('%.nii$', '.png')
     end
+    image.save(paths.concat(image_dir,'input',fname), image.scale(input[i],input[i]:size(2),input[i]:size(3)/opt.aspect_ratio))
+    image.save(paths.concat(image_dir,'output',fname), image.scale(output[i],output[i]:size(2),output[i]:size(3)/opt.aspect_ratio))
+    image.save(paths.concat(image_dir,'target',fname), image.scale(target[i],target[i]:size(2),target[i]:size(3)/opt.aspect_ratio))
+  end
     print('Saved images to: ', image_dir)
 
     if opt.display then

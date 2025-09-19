@@ -226,4 +226,34 @@ function util.containsValue(table, value)
   return false
 end
 
+-- HU-specific helpers
+function util.preprocess_HU(img, hu_min, hu_max)
+  local x = torch.Tensor(img:size()):copy(img)
+  x = torch.clamp(x, hu_min, hu_max)
+  x:add(-hu_min):mul(2.0/(hu_max - hu_min)):add(-1.0)
+  return x
+end
+
+function util.deprocess_HU(img, hu_min, hu_max)
+  local x = torch.Tensor(img:size()):copy(img)
+  x:add(1.0):mul(0.5*(hu_max - hu_min)):add(hu_min)
+  return x
+end
+
+function util.preprocess_HU_batch(batch, hu_min, hu_max)
+  local out = torch.Tensor(batch:size(1), batch:size(2), batch:size(3))
+  for i = 1, batch:size(1) do
+    out[i] = util.preprocess_HU(batch[i]:squeeze(), hu_min, hu_max)
+  end
+  return out
+end
+
 return util
+
+function util.deprocess_HU_batch(batch, hu_min, hu_max)
+  local out = {}
+  for i = 1, batch:size(1) do
+    out[i] = util.deprocess_HU(batch[i]:squeeze(), hu_min, hu_max)
+  end
+  return out
+end

@@ -33,6 +33,10 @@ opt = {
    which_direction = 'AtoB',    -- AtoB or BtoA
    phase = 'train',             -- train, val, test, etc
    preprocess = 'regular',      -- for special purpose preprocessing, e.g., for colorization, change this (selects preprocessing functions in util.lua)
+    -- HU/NIfTI options
+    hu_min = -1000,             -- HU lower window bound
+    hu_max = 3000,              -- HU upper window bound
+    exclude_slices = 0,         -- exclude N slices at both ends when sampling
    nThreads = 2,                -- # threads for loading data
    save_epoch_freq = 50,        -- save a model every save_epoch_freq epochs (does not overwrite previously saved models)
    save_latest_freq = 5000,     -- save the latest model every latest_freq sgd iterations (overwrites the previous latest model)
@@ -357,6 +361,17 @@ for epoch = 1, opt.niter do
                 disp.image(util.deprocessL_batch(real_A_s), {win=opt.display_id, title=opt.name .. ' input'})
                 disp.image(util.deprocessLAB_batch(real_A_s, fake_B_s), {win=opt.display_id+1, title=opt.name .. ' output'})
                 disp.image(util.deprocessLAB_batch(real_A_s, real_B_s), {win=opt.display_id+2, title=opt.name .. ' target'})
+            elseif opt.preprocess == 'nifti_hu' then
+                -- map [-1,1] to [0,1] for grayscale visualization
+                local real_A_s = util.scaleBatch(real_A:float(),100,100)
+                local fake_B_s = util.scaleBatch(fake_B:float(),100,100)
+                local real_B_s = util.scaleBatch(real_B:float(),100,100)
+                for i=1,real_A_s:size(1) do real_A_s[i]:add(1):div(2) end
+                for i=1,fake_B_s:size(1) do fake_B_s[i]:add(1):div(2) end
+                for i=1,real_B_s:size(1) do real_B_s[i]:add(1):div(2) end
+                disp.image(real_A_s,{win=opt.display_id, title=opt.name .. ' input'})
+                disp.image(fake_B_s,{win=opt.display_id+1, title=opt.name .. ' output'})
+                disp.image(real_B_s,{win=opt.display_id+2, title=opt.name .. ' target'})
             else
                 disp.image(util.deprocess_batch(util.scaleBatch(real_A:float(),100,100)), {win=opt.display_id, title=opt.name .. ' input'})
                 disp.image(util.deprocess_batch(util.scaleBatch(fake_B:float(),100,100)), {win=opt.display_id+1, title=opt.name .. ' output'})
@@ -382,6 +397,14 @@ for epoch = 1, opt.niter do
                     for i2=1, fake_B:size(1) do
                         if image_out==nil then image_out = torch.cat(util.deprocessL(real_A[i2]:float()),util.deprocessLAB(real_A[i2]:float(), fake_B[i2]:float()),3)/255.0
                         else image_out = torch.cat(image_out, torch.cat(util.deprocessL(real_A[i2]:float()),util.deprocessLAB(real_A[i2]:float(), fake_B[i2]:float()),3)/255.0, 2) end
+                    end
+                elseif opt.preprocess == 'nifti_hu' then
+                    for i2=1, fake_B:size(1) do
+                        local in_im = real_A[i2]:float():clone():add(1):div(2)
+                        local out_im = fake_B[i2]:float():clone():add(1):div(2)
+                        local pair = torch.cat(in_im, out_im, 3)
+                        if image_out==nil then image_out = pair
+                        else image_out = torch.cat(image_out, pair, 2) end
                     end
                 else
                     for i2=1, fake_B:size(1) do

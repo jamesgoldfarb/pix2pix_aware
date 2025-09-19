@@ -147,7 +147,7 @@ function dataset:__init(...)
    end
    ----------------------------------------------------------------------
    -- Options for the GNU find command
-   local extensionList = {'jpg', 'png','JPG','PNG','JPEG', 'ppm', 'PPM', 'bmp', 'BMP'}
+   local extensionList = {'jpg', 'png','JPG','PNG','JPEG', 'ppm', 'PPM', 'bmp', 'BMP', 'nii', 'nii.gz'}
    local findOptions = ' -iname "*.' .. extensionList[1] .. '"'
    for i=2,#extensionList do
       findOptions = findOptions .. ' -o -iname "*.' .. extensionList[i] .. '"'
